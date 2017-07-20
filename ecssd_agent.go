@@ -6,20 +6,20 @@ package main
 // or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 
 import (
+	"flag"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/cloudwatchevents"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/fsouza/go-dockerclient"
-	"github.com/aws/aws-sdk-go/service/cloudwatchevents"
-	"net/http"
 	"io/ioutil"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
-	"flag"
 )
 
 const workerTimeout = 180 * time.Second
@@ -118,7 +118,7 @@ func (th *dockerHandler) Handle(event *docker.APIEvents) error {
 type config struct {
 	HostedZoneId string
 	Hostname     string
-	Region		 string
+	Region       string
 }
 
 var configuration config
@@ -306,20 +306,20 @@ func getNetworkPortAndServiceName(container *docker.Container, includePort bool)
 	return svc
 }
 
-func sendToCWEvents (detail string, detailType string, resource string, source string) error {
+func sendToCWEvents(detail string, detailType string, resource string, source string) error {
 	config := aws.NewConfig().WithRegion(configuration.Region)
 	sess := session.New(config)
 	svc := cloudwatchevents.New(sess)
 	params := &cloudwatchevents.PutEventsInput{
 		Entries: []*cloudwatchevents.PutEventsRequestEntry{
 			{
-				Detail: aws.String(detail),
+				Detail:     aws.String(detail),
 				DetailType: aws.String(detailType),
 				Resources: []*string{
 					aws.String(resource),
 				},
 				Source: aws.String(source),
-				Time: aws.Time(time.Now()),
+				Time:   aws.Time(time.Now()),
 			},
 		},
 	}
@@ -349,7 +349,7 @@ func main() {
 	var zoneId string
 
 	var sendEvents = flag.Bool("cw-send-events", false, "Send CloudWatch events when a container is created or terminated")
-	
+
 	flag.Parse()
 
 	var DNSNameArg = flag.Arg(0)
@@ -402,7 +402,7 @@ func main() {
 		}
 		if *sendEvents {
 			taskArn := getTaskArn(event.ID)
-			sendToCWEvents(`{ "dockerId": "` + event.ID + `","TaskArn":"` + taskArn + `" }`, "Task Started", configuration.Hostname, "awslabs.ecs.container" )
+			sendToCWEvents(`{ "dockerId": "`+event.ID+`","TaskArn":"`+taskArn+`" }`, "Task Started", configuration.Hostname, "awslabs.ecs.container")
 		}
 		fmt.Println("Docker " + event.ID + " started")
 		return nil
@@ -431,7 +431,7 @@ func main() {
 		}
 		if *sendEvents {
 			taskArn := getTaskArn(event.ID)
-			sendToCWEvents(`{ "dockerId": "` + event.ID + `","TaskArn":"` + taskArn + `" }`, "Task Stopped", configuration.Hostname, "awslabs.ecs.container" )
+			sendToCWEvents(`{ "dockerId": "`+event.ID+`","TaskArn":"`+taskArn+`" }`, "Task Stopped", configuration.Hostname, "awslabs.ecs.container")
 		}
 		fmt.Println("Docker " + event.ID + " stopped")
 		return nil
