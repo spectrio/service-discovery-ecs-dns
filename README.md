@@ -1,4 +1,24 @@
 # Service Discovery for AWS EC2 Container Service
+
+_This is a fork of [awslabs/service-discovery-ecs-dns](https://github.com/awslabs/service-discovery-ecs-dns)._
+
+> The upstream project, as described below, implements Route53 based service discovery by creating a separate SRV record for each container that is launched. This allows Route53 to load balance between the containers for you, but does not allow you to query for all instances without resorting to using an API call.
+
+> This fork changes the implementation slightly to only create 1 SRV record for each service which returns all containers currently running for that service. This is useful if load balancing is handled differently in your stack, or for conditions where you need all instances of a service (like cache busting).
+
+> All of the following documentation should still apply, except for the Lambda based check, which still needs to be updated.
+
+## Builds
+
+The latest release is available in the [releases](https://github.com/10footwave/service-discovery-ecs-dns/releases) tab.
+
+To build this project:
+
+```sh
+GOOS=linux go build -o bin/ecssd_agent -v ecssd_agent.go
+```
+
+
 ## Goals
 This project has been created to facilitate the creation of MicroServices on top of AWS ECS.
 
@@ -68,4 +88,3 @@ curl -u admin:password 127.0.0.1:32799/calc/\(2+2\)*3
 You can launch the examples using the cloudformation template "Service_Discovery_Using_DNS.template", then you can connect to the portal from a browser and test both microservices and the service discovery.
 
 You can review the Route53 records created by the service (only for time and calc, because portal is not a microservice and it doesn't provide the SERVICE_\<port>_NAME env variable), and stop a container to see how the Route53 records change automatically.
-
