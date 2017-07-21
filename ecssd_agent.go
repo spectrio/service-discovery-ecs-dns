@@ -194,12 +194,18 @@ func createDNSRecord(serviceName string, dockerId string, port string) error {
 		return listErr
 	}
 
+	var existing []*route53.ResourceRecord
+
 	for _, rrset := range resp.ResourceRecordSets {
 		for _, rrecords := range rrset.ResourceRecords {
 			srvValue := aws.StringValue(rrecords.Value)
+			existing = append(existing, rrecords)
 			fmt.Println("Existing " + srvValue)
 		}
 	}
+
+	newRecord := &route53.ResourceRecord{Value: aws.String("1 1 " + port + " " + configuration.Hostname)}
+	existing = append(existing, newRecord)
 
 	// This API call creates a new DNS record for this service
 	params := &route53.ChangeResourceRecordSetsInput{
@@ -210,20 +216,9 @@ func createDNSRecord(serviceName string, dockerId string, port string) error {
 					ResourceRecordSet: &route53.ResourceRecordSet{
 						Name: aws.String(srvRecordName),
 						// It creates a SRV record with the name of the service
-						Type: aws.String(route53.RRTypeSrv),
-						ResourceRecords: []*route53.ResourceRecord{
-							{
-								// priority: the priority of the target host, lower value means more preferred
-								// weight: A relative weight for records with the same priority, higher value means more preferred
-								// port: the TCP or UDP port on which the service is to be found
-								// target: the canonical hostname of the machine providing the service
-								Value: aws.String("1 1 " + port + " " + configuration.Hostname),
-							},
-							{
-								Value: aws.String("2 1 " + port + " " + configuration.Hostname),
-							},
-						},
-						SetIdentifier: aws.String(serviceName),
+						Type:            aws.String(route53.RRTypeSrv),
+						ResourceRecords: existing,
+						SetIdentifier:   aws.String(serviceName),
 						// TTL=0 to avoid DNS caches
 						TTL:    aws.Int64(defaultTTL),
 						Weight: aws.Int64(defaultWeight),
