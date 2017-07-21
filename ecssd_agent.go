@@ -316,6 +316,10 @@ func getNetworkPortAndServiceName(container *docker.Container, includePort bool)
 		if len(envEval) == 2 && len(nameEval) == 3 && nameEval[0] == "SERVICE" && nameEval[2] == "NAME" {
 			if _, err := strconv.Atoi(nameEval[1]); err == nil {
 				if includePort {
+					fmt.Println("including port...")
+					fmt.Println("ports...")
+					fmt.Printf("%v", container.NetworkSettings.Ports)
+					fmt.Println("")
 					for srcPort, mapping := range container.NetworkSettings.Ports {
 						portEval := strings.Split(string(srcPort), "/")
 						fmt.Printf("port: %v", portEval)
