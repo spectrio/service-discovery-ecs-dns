@@ -197,6 +197,9 @@ func createDNSRecord(serviceName string, dockerId string, port string) error {
 								// target: the canonical hostname of the machine providing the service
 								Value: aws.String("1 1 " + port + " " + configuration.Hostname),
 							},
+							{
+								Value: aws.String("1 1 " + port + " " + configuration.Hostname),
+							},
 						},
 						SetIdentifier: aws.String(serviceName),
 						// TTL=0 to avoid DNS caches
