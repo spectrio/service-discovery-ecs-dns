@@ -235,7 +235,7 @@ func createDNSRecord(serviceName string, dockerId string, port string) error {
 	return err
 }
 
-func deleteDNSRecord(serviceName string, dockerId string) error {
+func deleteDNSRecord(serviceName string, dockerId string, port string) error {
 	var err error
 	r53 := route53.New(session.New())
 	srvRecordName := serviceName + "." + DNSName
@@ -243,7 +243,7 @@ func deleteDNSRecord(serviceName string, dockerId string) error {
 	paramsList := &route53.ListResourceRecordSetsInput{
 		HostedZoneId:          aws.String(configuration.HostedZoneId), // Required
 		MaxItems:              aws.String("10"),
-		StartRecordIdentifier: aws.String(dockerId),
+		StartRecordIdentifier: aws.String(serviceName),
 		StartRecordName:       aws.String(srvRecordName),
 		StartRecordType:       aws.String(route53.RRTypeSrv),
 	}
@@ -252,18 +252,18 @@ func deleteDNSRecord(serviceName string, dockerId string) error {
 	if err != nil {
 		return err
 	}
-	srvValue := ""
+
+	var newRecords []*route53.ResourceRecord
+	deleteValue := "1 1 " + port + " " + configuration.Hostname
+
 	for _, rrset := range resp.ResourceRecordSets {
-		if *rrset.SetIdentifier == dockerId && (*rrset.Name == srvRecordName || *rrset.Name == srvRecordName+".") {
-			for _, rrecords := range rrset.ResourceRecords {
-				srvValue = aws.StringValue(rrecords.Value)
-				break
+		for _, rrecords := range rrset.ResourceRecords {
+			srvValue := aws.StringValue(rrecords.Value)
+			if srvValue != deleteValue {
+				newRecords = append(newRecords, rrecords)
+				fmt.Println("Keeping " + srvValue)
 			}
 		}
-	}
-	if srvValue == "" {
-		log.Error("Route53 Record doesn't exist")
-		return nil
 	}
 
 	// This API call deletes the DNS record for the service for this docker ID
@@ -271,18 +271,14 @@ func deleteDNSRecord(serviceName string, dockerId string) error {
 		ChangeBatch: &route53.ChangeBatch{
 			Changes: []*route53.Change{
 				{
-					Action: aws.String(route53.ChangeActionDelete),
+					Action: aws.String(route53.ChangeActionUpsert),
 					ResourceRecordSet: &route53.ResourceRecordSet{
-						Name: aws.String(srvRecordName),
-						Type: aws.String(route53.RRTypeSrv),
-						ResourceRecords: []*route53.ResourceRecord{
-							{
-								Value: aws.String(srvValue),
-							},
-						},
-						SetIdentifier: aws.String(dockerId),
-						TTL:           aws.Int64(defaultTTL),
-						Weight:        aws.Int64(defaultWeight),
+						Name:            aws.String(srvRecordName),
+						Type:            aws.String(route53.RRTypeSrv),
+						ResourceRecords: newRecords,
+						SetIdentifier:   aws.String(serviceName),
+						TTL:             aws.Int64(defaultTTL),
+						Weight:          aws.Int64(defaultWeight),
 					},
 				},
 			},
@@ -291,7 +287,7 @@ func deleteDNSRecord(serviceName string, dockerId string) error {
 	}
 	_, err = r53.ChangeResourceRecordSets(params)
 	logErrorNoFatal(err)
-	fmt.Println("Record " + srvRecordName + " deleted ( " + srvValue + ")")
+	fmt.Println("Record " + srvRecordName + " deleted (" + deleteValue + ")")
 	return err
 }
 
@@ -432,12 +428,12 @@ func main() {
 		var err error
 		container, err := dockerClient.InspectContainer(event.ID)
 		logErrorAndFail(err)
-		allService := getNetworkPortAndServiceName(container, false)
+		allService := getNetworkPortAndServiceName(container, true)
 		for _, svc := range allService {
 			if svc.Name != "" {
 				sum = 1
 				for {
-					if err = deleteDNSRecord(svc.Name, event.ID); err == nil {
+					if err = deleteDNSRecord(svc.Name, event.ID, svc.Port); err == nil {
 						break
 					}
 					if sum > 8 {
