@@ -311,11 +311,15 @@ func getNetworkPortAndServiceName(container *docker.Container, includePort bool)
 	for _, env := range container.Config.Env {
 		envEval := strings.Split(env, "=")
 		nameEval := strings.Split(envEval[0], "_")
+		fmt.Printf("env: %v", envEval)
+		fmt.Printf("name: %v", nameEval)
 		if len(envEval) == 2 && len(nameEval) == 3 && nameEval[0] == "SERVICE" && nameEval[2] == "NAME" {
 			if _, err := strconv.Atoi(nameEval[1]); err == nil {
 				if includePort {
 					for srcPort, mapping := range container.NetworkSettings.Ports {
 						portEval := strings.Split(string(srcPort), "/")
+						fmt.Printf("port: %v", portEval)
+						fmt.Printf("mapping: %v", mapping)
 						if len(portEval) > 0 && portEval[0] == nameEval[1] {
 							if len(mapping) > 0 {
 								svc = append(svc, ServiceInfo{envEval[1], mapping[0].HostPort})
