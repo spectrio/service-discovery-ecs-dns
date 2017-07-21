@@ -250,6 +250,7 @@ func deleteDNSRecord(serviceName string, dockerId string, port string) error {
 	resp, err := r53.ListResourceRecordSets(paramsList)
 	logErrorNoFatal(err)
 	if err != nil {
+		fmt.Println(err)
 		return err
 	}
 
@@ -265,6 +266,8 @@ func deleteDNSRecord(serviceName string, dockerId string, port string) error {
 			}
 		}
 	}
+
+	fmt.Println(newRecords)
 
 	// This API call deletes the DNS record for the service for this docker ID
 	params := &route53.ChangeResourceRecordSetsInput{
