@@ -179,6 +179,28 @@ func getDNSHostedZoneId() (string, error) {
 func createDNSRecord(serviceName string, dockerId string, port string) error {
 	r53 := route53.New(session.New())
 	srvRecordName := serviceName + "." + DNSName
+
+	// This API Call looks for the Route53 DNS record for this service and docker ID to get the values to delete
+	paramsList := &route53.ListResourceRecordSetsInput{
+		HostedZoneId:          aws.String(configuration.HostedZoneId), // Required
+		MaxItems:              aws.String("10"),
+		StartRecordIdentifier: aws.String(serviceName),
+		StartRecordName:       aws.String(srvRecordName),
+		StartRecordType:       aws.String(route53.RRTypeSrv),
+	}
+	resp, listErr := r53.ListResourceRecordSets(paramsList)
+	logErrorNoFatal(listErr)
+	if listErr != nil {
+		return listErr
+	}
+
+	for _, rrset := range resp.ResourceRecordSets {
+		for _, rrecords := range rrset.ResourceRecords {
+			srvValue := aws.StringValue(rrecords.Value)
+			fmt.Println("Existing " + srvValue)
+		}
+	}
+
 	// This API call creates a new DNS record for this service
 	params := &route53.ChangeResourceRecordSetsInput{
 		ChangeBatch: &route53.ChangeBatch{
