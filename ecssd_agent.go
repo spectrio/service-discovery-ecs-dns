@@ -180,7 +180,7 @@ func createDNSRecord(serviceName string, dockerId string, port string) error {
 	r53 := route53.New(session.New())
 	srvRecordName := serviceName + "." + DNSName
 
-	// This API Call looks for the Route53 DNS record for this service and docker ID to get the values to delete
+	// This API Call looks for the Route53 DNS record for this service so we can make updates to it.
 	paramsList := &route53.ListResourceRecordSetsInput{
 		HostedZoneId:          aws.String(configuration.HostedZoneId), // Required
 		MaxItems:              aws.String("10"),
@@ -196,6 +196,7 @@ func createDNSRecord(serviceName string, dockerId string, port string) error {
 
 	var existing []*route53.ResourceRecord
 
+	// iterate through existing records and get their value
 	for _, rrset := range resp.ResourceRecordSets {
 		for _, rrecords := range rrset.ResourceRecords {
 			srvValue := aws.StringValue(rrecords.Value)
@@ -204,6 +205,7 @@ func createDNSRecord(serviceName string, dockerId string, port string) error {
 		}
 	}
 
+	// append new record to the list of existing records
 	newRecord := &route53.ResourceRecord{Value: aws.String("1 1 " + port + " " + configuration.Hostname)}
 	existing = append(existing, newRecord)
 
@@ -254,10 +256,12 @@ func deleteDNSRecord(serviceName string, dockerId string) error {
 	}
 
 	keepRecords := make(map[string]bool)
+	// get all containers running on this host
 	running, err := dockerClient.ListContainers(docker.ListContainersOptions{All: true})
 	if err != nil {
 		return err
 	}
+	// iterate over running containers and generate a map of existing values
 	for _, container := range running {
 		for _, ports := range container.Ports {
 			fmt.Printf("Found: %v", ports.PublicPort)
@@ -269,6 +273,8 @@ func deleteDNSRecord(serviceName string, dockerId string) error {
 
 	var newRecords []*route53.ResourceRecord
 	var oldRecord string
+	// iterate over existing record values, and only keep them if they are currently running on this host,
+	// or belong to some other host
 	for _, rrset := range resp.ResourceRecordSets {
 		for _, rrecords := range rrset.ResourceRecords {
 			srvValue := aws.StringValue(rrecords.Value)
