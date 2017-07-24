@@ -6,6 +6,8 @@ _This is a fork of [awslabs/service-discovery-ecs-dns](https://github.com/awslab
 
 > This fork changes the implementation slightly to only create 1 SRV record for each service which returns all containers currently running for that service. This is useful if load balancing is handled differently in your stack, or for conditions where you need all instances of a service (like cache busting).
 
+> All of the following documentation should still apply, except for the Lambda based check, which still needs to be updated.
+
 ## Goals
 This project has been created to facilitate the creation of MicroServices on top of AWS ECS.
 
