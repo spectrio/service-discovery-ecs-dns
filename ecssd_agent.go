@@ -236,7 +236,6 @@ func createDNSRecord(serviceName string, dockerId string, port string) error {
 }
 
 func deleteDNSRecord(serviceName string, dockerId string, port string) error {
-	fmt.Println("starting delete...")
 	var err error
 	r53 := route53.New(session.New())
 	srvRecordName := serviceName + "." + DNSName
@@ -251,8 +250,6 @@ func deleteDNSRecord(serviceName string, dockerId string, port string) error {
 	resp, err := r53.ListResourceRecordSets(paramsList)
 	logErrorNoFatal(err)
 	if err != nil {
-		fmt.Println("has error...")
-		fmt.Println(err)
 		return err
 	}
 
@@ -262,18 +259,12 @@ func deleteDNSRecord(serviceName string, dockerId string, port string) error {
 	for _, rrset := range resp.ResourceRecordSets {
 		for _, rrecords := range rrset.ResourceRecords {
 			srvValue := aws.StringValue(rrecords.Value)
-			fmt.Println("found " + srvValue)
 			if srvValue != deleteValue {
-				fmt.Println("match")
 				newRecords = append(newRecords, rrecords)
 				fmt.Println("Keeping " + srvValue)
-			} else {
-				fmt.Println(deleteValue + " does not match " + srvValue)
 			}
 		}
 	}
-
-	fmt.Println(newRecords)
 
 	// This API call deletes the DNS record for the service for this docker ID
 	params := &route53.ChangeResourceRecordSetsInput{
@@ -311,19 +302,11 @@ func getNetworkPortAndServiceName(container *docker.Container, includePort bool)
 	for _, env := range container.Config.Env {
 		envEval := strings.Split(env, "=")
 		nameEval := strings.Split(envEval[0], "_")
-		fmt.Printf("env: %v", envEval)
-		fmt.Printf("name: %v", nameEval)
 		if len(envEval) == 2 && len(nameEval) == 3 && nameEval[0] == "SERVICE" && nameEval[2] == "NAME" {
 			if _, err := strconv.Atoi(nameEval[1]); err == nil {
 				if includePort {
-					fmt.Println("including port...")
-					fmt.Println("ports...")
-					fmt.Printf("%v", container.NetworkSettings.Ports)
-					fmt.Println("")
 					for srcPort, mapping := range container.NetworkSettings.Ports {
 						portEval := strings.Split(string(srcPort), "/")
-						fmt.Printf("port: %v", portEval)
-						fmt.Printf("mapping: %v", mapping)
 						if len(portEval) > 0 && portEval[0] == nameEval[1] {
 							if len(mapping) > 0 {
 								svc = append(svc, ServiceInfo{envEval[1], mapping[0].HostPort})
@@ -442,22 +425,15 @@ func main() {
 	}
 
 	stopFn := func(event *docker.APIEvents) error {
-		fmt.Println("starting stop function")
 		var err error
 		container, err := dockerClient.InspectContainer(event.ID)
 		logErrorAndFail(err)
-		fmt.Println("here")
-		fmt.Println(container)
 		allService := getNetworkPortAndServiceName(container, true)
-		fmt.Println("here 2")
-		fmt.Println(allService)
 		for _, svc := range allService {
-			fmt.Println("service name: " + svc.Name)
 			if svc.Name != "" {
 				sum = 1
 				for {
 					if err = deleteDNSRecord(svc.Name, event.ID, svc.Port); err == nil {
-						fmt.Println("no error returned")
 						break
 					}
 					if sum > 8 {
