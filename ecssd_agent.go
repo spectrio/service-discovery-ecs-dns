@@ -253,7 +253,7 @@ func deleteDNSRecord(serviceName string, dockerId string) error {
 		return err
 	}
 
-	var keepRecords map[string]bool
+	keepRecords := make(map[string]bool)
 	running, err := dockerClient.ListContainers(docker.ListContainersOptions{All: true})
 	if err != nil {
 		return err
