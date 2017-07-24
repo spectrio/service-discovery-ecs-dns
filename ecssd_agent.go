@@ -235,7 +235,7 @@ func createDNSRecord(serviceName string, dockerId string, port string) error {
 	return err
 }
 
-func deleteDNSRecord(serviceName string, dockerId string, port string) error {
+func deleteDNSRecord(serviceName string, dockerId string) error {
 	var err error
 	r53 := route53.New(session.New())
 	srvRecordName := serviceName + "." + DNSName
@@ -253,15 +253,30 @@ func deleteDNSRecord(serviceName string, dockerId string, port string) error {
 		return err
 	}
 
-	var newRecords []*route53.ResourceRecord
-	deleteValue := "1 1 " + port + " " + configuration.Hostname
+	var keepRecords map[string]bool
+	running, err := dockerClient.ListContainers(docker.ListContainersOptions{All: true})
+	if err != nil {
+		return err
+	}
+	for _, container := range running {
+		for _, ports := range container.Ports {
+			fmt.Printf("Found: %v", ports.PublicPort)
+			fmt.Println("")
+			keepVal := "1 1 " + strconv.FormatInt(ports.PublicPort, 10) + " " + configuration.Hostname
+			keepRecords[keepVal] = true
+		}
+	}
 
+	var newRecords []*route53.ResourceRecord
+	var oldRecord string
 	for _, rrset := range resp.ResourceRecordSets {
 		for _, rrecords := range rrset.ResourceRecords {
 			srvValue := aws.StringValue(rrecords.Value)
-			if srvValue != deleteValue {
+			if keepRecords[srvValue] {
 				newRecords = append(newRecords, rrecords)
 				fmt.Println("Keeping " + srvValue)
+			} else {
+				oldRecord = srvValue
 			}
 		}
 	}
@@ -287,7 +302,7 @@ func deleteDNSRecord(serviceName string, dockerId string, port string) error {
 	}
 	_, err = r53.ChangeResourceRecordSets(params)
 	logErrorNoFatal(err)
-	fmt.Println("Record " + srvRecordName + " deleted (" + deleteValue + ")")
+	fmt.Println("Record " + srvRecordName + " deleted (" + oldRecord + ")")
 	return err
 }
 
@@ -428,12 +443,12 @@ func main() {
 		var err error
 		container, err := dockerClient.InspectContainer(event.ID)
 		logErrorAndFail(err)
-		allService := getNetworkPortAndServiceName(container, true)
+		allService := getNetworkPortAndServiceName(container, false)
 		for _, svc := range allService {
 			if svc.Name != "" {
 				sum = 1
 				for {
-					if err = deleteDNSRecord(svc.Name, event.ID, svc.Port); err == nil {
+					if err = deleteDNSRecord(svc.Name, event.ID); err == nil {
 						break
 					}
 					if sum > 8 {
