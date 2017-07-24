@@ -1,4 +1,11 @@
 # Service Discovery for AWS EC2 Container Service
+
+_This is a fork of [awslabs/service-discovery-ecs-dns](https://github.com/awslabs/service-discovery-ecs-dns)._
+
+The upstream project, as described below, implements Route53 based service discovery by creating a separate SRV record for each container that is launched. This allows Route53 to load balance between the containers for you, but does not allow you to query for all instances without resorting to using an API call.
+
+This fork changes the implementation slightly to only create 1 SRV record for each service which returns all containers currently running for that service. This is useful if load balancing is handled differently in your stack, or for conditions where you need all instances of a service (like cache busting).
+
 ## Goals
 This project has been created to facilitate the creation of MicroServices on top of AWS ECS.
 
