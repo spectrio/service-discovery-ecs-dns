@@ -239,7 +239,7 @@ func deleteDNSRecord(serviceName string, dockerId string) error {
 	var err error
 	r53 := route53.New(session.New())
 	srvRecordName := serviceName + "." + DNSName
-	// This API Call looks for the Route53 DNS record for this service and docker ID to get the values to delete
+	// This API Call looks for the Route53 DNS record for this service so we can make updates to it.
 	paramsList := &route53.ListResourceRecordSetsInput{
 		HostedZoneId:          aws.String(configuration.HostedZoneId), // Required
 		MaxItems:              aws.String("10"),
@@ -272,10 +272,16 @@ func deleteDNSRecord(serviceName string, dockerId string) error {
 	for _, rrset := range resp.ResourceRecordSets {
 		for _, rrecords := range rrset.ResourceRecords {
 			srvValue := aws.StringValue(rrecords.Value)
-			if keepRecords[srvValue] {
+			if !strings.Contains(srvValue, configuration.Hostname) {
+				// if from a different host, don't remove
 				newRecords = append(newRecords, rrecords)
-				fmt.Println("Keeping " + srvValue)
+				fmt.Println("Keep (non-host): " + srvValue)
+			} else if keepRecords[srvValue] {
+				// if from this host and port still valid, don't remove
+				newRecords = append(newRecords, rrecords)
+				fmt.Println("Keeping (host): " + srvValue)
 			} else {
+				// this is the record to be removed
 				oldRecord = srvValue
 			}
 		}
